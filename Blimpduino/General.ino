@@ -21,12 +21,12 @@ void Dameon_Loop(void) { //Background stuff.
 
   }
   /**************************************************/
-  if (distanceSensor.newDataReady() == true) //Checking LIDAR
+  if (distanceSensor.checkForDataReady() == true) //Checking LIDAR
   {
     timer_laser = micros(); //Recording when this laser data was captured (Timestamp).. NOTE that is microseconds, no milliseconds.
     laser_height = distanceSensor.getDistance();//Reading off the data.
     laser_newDataReady = 1; //Little flag to know when new data is ready.
-    distanceSensor.startMeasurement(); //Start next measurement. This takes a few milliseconds, so we start the process in the meantime.
+    distanceSensor.startRanging(); //Start next measurement. This takes a few milliseconds, so we start the process in the meantime.
     height = height * 0.7 + laser_height * 0.3; //Low pass filter to attenuate the noise readings.
 
     height_dt = (timer_laser - timer_laser_old) * 0.000001; //calculating the time between readings.
@@ -64,17 +64,23 @@ void USB_Print_Loop(int refreshRate) {
 
   if ((millis() - timer_termPrint) > refreshRate) {
 
-    BatteryValue = analogRead(A0) / 16; // / BATTERY_FACTOR;
+    BatteryValue = analogRead(BATTERY_PIN) / 16; // / BATTERY_FACTOR;
     if (BatteryValue < 37)
-      digitalWrite(A2, HIGH); // Battery warning
+      digitalWrite(GREEN_LED, HIGH); // Battery warning
     else
-      digitalWrite(A2, LOW);
+      digitalWrite(GREEN_LED, LOW);
     char auxS[25];
     char aux2[100];
     //sprintf(auxS, "$tA,%+04d", height/10);
 
     sprintf(auxS, "B:%02d A:%+04d T:%+04d H:%04d", int(BatteryValue), int(MPU_yaw_angle), int(target_angle), int(laser_height));
+#ifdef ESP32
+    Udp.beginPacket(telemetryAddress, UDP_TELEMETRY_PORT);
+    Udp.print(auxS);
+    Udp.endPacket();
+#else
     Serial1.println(auxS);
+#endif
     sprintf(aux2, "Batt:%02d Yaw:%+04d SetP:%+04d LIDAR:%04d M0:%+04d M1:%+04d M2:%+04d CH5:%02d Mode:%02d", int(BatteryValue), int(MPU_yaw_angle), int(target_angle), int(height), int(mRight_Value), int(mLeft_Value), int(mVertical_Value), int(iCH5), int(modeSelector));
     SerialUSB.write(aux2);
     SerialUSB.println(" ");

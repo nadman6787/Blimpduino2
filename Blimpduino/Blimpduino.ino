@@ -11,13 +11,23 @@
 // Project URL:
 
 #include <Wire.h>
-#include <SparkFun_VL53L1X_Arduino_Library.h>
-#include <vl53l1_register_map.h>
+#include <SparkFun_VL53L1X.h>
 #include <Adafruit_BMP280.h>
+#ifdef ESP32
+#include <WiFi.h>
+#include <WiFiUdp.h>
+#endif
+
+#ifndef SerialUSB
+#define SerialUSB Serial
+#endif
 
 Adafruit_BMP280 bme;
 
 #define TELEMETRY "192.168.4.2" // Default telemetry server (first client) port 2223
+#define UDP_CONTROL_PORT 2222
+#define UDP_TELEMETRY_PORT 2223
+#define WIFI_AP_PASSWORD "87654321"
 
 // NORMAL MODE PARAMETERS (MAXIMUN SETTINGS)
 #define MAX_THROTTLE 240
@@ -46,8 +56,33 @@ Adafruit_BMP280 bme;
 #define MSGMAXLEN 20  // Max message length. Message from the APP (parameters)
 #define NODATA -20000
 
+#ifdef ESP32
+#define RED_LED 2
+#define GREEN_LED 4
+#define BATTERY_PIN 34
+#define ESP32_I2C_SDA 21
+#define ESP32_I2C_SCL 22
+
+#define MOTOR0_PIN_A 25
+#define MOTOR0_PIN_B 26
+#define MOTOR1_PIN_A 27
+#define MOTOR1_PIN_B 14
+#define MOTOR2_PIN_A 32
+#define MOTOR2_PIN_B 33
+#else
 #define RED_LED A1
 #define GREEN_LED A2
+#define BATTERY_PIN A0
+
+#define MOTOR0_PIN_A 5
+#define MOTOR0_PIN_B 6
+#define MOTOR1_PIN_A 9
+#define MOTOR1_PIN_B 10
+#define MOTOR2_PIN_A 7
+#define MOTOR2_PIN_B 8
+#define MOTOR3_PIN_A 11
+#define MOTOR3_PIN_B 12
+#endif
 
 /*HEre you must define the physical port your motor is connected*/
 #define mR 1 //Motor Right connected to port m1 
@@ -62,7 +97,11 @@ Adafruit_BMP280 bme;
 
 #define P0 1013.25
 
-VL53L1X distanceSensor;
+SFEVL53L1X distanceSensor;
+#ifdef ESP32
+WiFiUDP Udp;
+IPAddress telemetryAddress;
+#endif
 
 String MAC;  // MAC address of Wifi module
 
@@ -149,11 +188,17 @@ void setup()
 
   delay(2000);
   SerialUSB.begin(115200); // Serial output to console
+#ifndef ESP32
   Serial1.begin(115200);
+#endif
   SerialUSB.println("Inicializando");
 
   // Initialize I2C bus (MPU6050 is connected via I2C)
+#ifdef ESP32
+  Wire.begin(ESP32_I2C_SDA, ESP32_I2C_SCL);
+#else
   Wire.begin();
+#endif
 
 #if DEBUG > 0
   delay(9000);
@@ -167,6 +212,21 @@ void setup()
   MPU6050_setup();  // setup MPU6050 IMU at 50Hz
   delay(500);
 
+#ifdef ESP32
+  SerialUSB.println("ESP32 WIFI init");
+  String apName = "JJROBOTS_" + WiFi.macAddress();
+  apName.replace(":", "");
+  apName = apName.substring(0, 10);
+  WiFi.mode(WIFI_AP);
+  WiFi.softAP(apName.c_str(), WIFI_AP_PASSWORD);
+  Udp.begin(UDP_CONTROL_PORT);
+  telemetryAddress.fromString(TELEMETRY);
+  MAC = WiFi.macAddress();
+  SerialUSB.print("AP SSID:");
+  SerialUSB.println(apName);
+  SerialUSB.print("AP IP:");
+  SerialUSB.println(WiFi.softAPIP());
+#else
   // With the new ESP8266 WIFI MODULE WE NEED TO MAKE AN INITIALIZATION PROCESS
   SerialUSB.println("WIFI init");
   Serial1.flush();
@@ -222,10 +282,11 @@ void setup()
   strcat(Telemetry, "\",2223,2222,0");
   ESPsendCommand(Telemetry, "OK", 3);
 
+  ESPsendCommand("AT+CIPSEND", ">", 2); // Start transmission (transparent mode)
+#endif
+
   // Calibrate gyros
   MPU6050_calibrate();
-
-  ESPsendCommand("AT+CIPSEND", ">", 2); // Start transmission (transparent mode)
 
   if (distanceSensor.begin() == false)
     SerialUSB.println("Holly Fffff, LIDAR is offline!");
@@ -233,11 +294,11 @@ void setup()
     SerialUSB.println("LIDAR OK!");
 
   // Take first laser reading
-  distanceSensor.startMeasurement(); //Jose Julio, agregale TIMEOUT para que no se cuelgue. Plis
-  while (distanceSensor.newDataReady() == false)
+  distanceSensor.startRanging(); //Jose Julio, agregale TIMEOUT para que no se cuelgue. Plis
+  while (distanceSensor.checkForDataReady() == false)
     delay(5);
   laser_height = distanceSensor.getDistance();
-  distanceSensor.startMeasurement();
+  distanceSensor.startRanging();
   height = laser_height;
   laser_newDataReady = 1;
   timer_laser = millis();
@@ -270,7 +331,7 @@ void setup()
 
   }
 
-  BatteryValue = analogRead(A0) / BATTERY_FACTOR;
+  BatteryValue = analogRead(BATTERY_PIN) / BATTERY_FACTOR;
 #if TELEMETRY_BATTERY==1
   SerialUSB.print("BATT:");
   SerialUSB.print(BatteryValue);
@@ -398,7 +459,11 @@ void loop()
       break;
 
     default: //Unknown State.
+#ifdef ESP32
+      SerialUSB.print("Unknown state");
+#else
       Serial1.print("Bunny in the pot");
+#endif
       break;
 
   } /*------->System Mode ends<-------*/

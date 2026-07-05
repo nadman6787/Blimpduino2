@@ -5,6 +5,9 @@
 
 int ESPwait(String stopstr, int timeout_secs)
 {
+#ifdef ESP32
+  return 0;
+#else
   String response;
   bool found = false;
   char c;
@@ -31,11 +34,16 @@ int ESPwait(String stopstr, int timeout_secs)
     } // end Serial1_available()
   } // end while (!found)
   return 1;
+#endif
 }
 
 // getMacAddress from ESP wifi module
 int ESPgetMac()
 {
+#ifdef ESP32
+  MAC = WiFi.macAddress();
+  return 1;
+#else
   char c1, c2;
   bool timeout = false;
   long timer_init;
@@ -81,13 +89,19 @@ int ESPgetMac()
   SerialUSB.println("!Timeout!");
   Serial1.flush();
   return -1;  // timeout
+#endif
 }
 
 int ESPsendCommand(char *command, String stopstr, int timeout_secs)
 {
+#ifdef ESP32
+  return 0;
+#else
   Serial1.println(command);
   ESPwait(stopstr, timeout_secs);
   delay(250);
+  return 1;
+#endif
 }
 
 int32_t ExtractParamInt4b(uint8_t pos) {
@@ -117,6 +131,41 @@ void MsgRead()
 {
 
   uint8_t i;
+#ifdef ESP32
+  int packetSize = Udp.parsePacket();
+  while (packetSize > 0) {
+    while (Udp.available() > 0) {
+      for (i = 0; i < (MSGMAXLEN - 1); i++) {
+        MsgBuffer[i] = MsgBuffer[i + 1];
+      }
+      MsgBuffer[MSGMAXLEN - 1] = (uint8_t)Udp.read();
+
+      if ((char(MsgBuffer[0]) == 'J') && (char(MsgBuffer[1]) == 'J') && (char(MsgBuffer[2]) == 'B') && (char(MsgBuffer[3]) == 'M')) {
+        iCH1 = ExtractParamInt2b(4);
+        iCH2 = ExtractParamInt2b(6);
+        iCH3 = ExtractParamInt2b(8);
+        iCH4 = ExtractParamInt2b(10);
+        iCH5 = ExtractParamInt2b(12);
+        iCH6 = ExtractParamInt2b(14);
+        iCH7 = ExtractParamInt2b(16);
+        iCH8 = ExtractParamInt2b(18);
+        newMessage = 1;
+      }
+      if ((char(MsgBuffer[0]) == 'J') && (char(MsgBuffer[1]) == 'J') && (char(MsgBuffer[2]) == 'B') && (char(MsgBuffer[3]) == 'A')) {
+        iCH1 = ExtractParamInt2b(4);
+        iCH2 = ExtractParamInt2b(6);
+        iCH3 = ExtractParamInt2b(8);
+        iCH4 = ExtractParamInt2b(10);
+        iCH5 = ExtractParamInt2b(12);
+        iCH6 = ExtractParamInt2b(14);
+        iCH7 = ExtractParamInt2b(16);
+        iCH8 = ExtractParamInt2b(18);
+        newMessage = 1;
+      }
+    }
+    packetSize = Udp.parsePacket();
+  }
+#else
   // New bytes available to process?
   while (Serial1.available() > 0) {
     // We rotate the Buffer (we could implement a ring buffer in future)
@@ -159,6 +208,7 @@ void MsgRead()
       newMessage = 1;
     }
   }
+#endif
   /************************************************************/
 }
 

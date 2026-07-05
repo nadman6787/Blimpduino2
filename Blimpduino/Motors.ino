@@ -1,23 +1,20 @@
 void initilize_motors(void) {
 
-  // Blimpduino pins
-  // Motor0
-  pinMode(5, OUTPUT);
-  pinMode(6, OUTPUT);
-  // Motor1
-  pinMode(9, OUTPUT);
-  pinMode(10, OUTPUT);
-  // Motor2
-  pinMode(7, OUTPUT);
-  pinMode(8, OUTPUT);
-  // Motor3
-  pinMode(11, OUTPUT);
-  pinMode(12, OUTPUT);
+  pinMode(MOTOR0_PIN_A, OUTPUT);
+  pinMode(MOTOR0_PIN_B, OUTPUT);
+  pinMode(MOTOR1_PIN_A, OUTPUT);
+  pinMode(MOTOR1_PIN_B, OUTPUT);
+  pinMode(MOTOR2_PIN_A, OUTPUT);
+  pinMode(MOTOR2_PIN_B, OUTPUT);
+#ifndef ESP32
+  pinMode(MOTOR3_PIN_A, OUTPUT);
+  pinMode(MOTOR3_PIN_B, OUTPUT);
+#endif
 
   //Beeping motors:
   for (int q = 0; q <= 2; q++)
   {
-    for (int m = 0; m <= 3; m++)
+    for (int m = 0; m <= 2; m++)
     {
       m_set_direct(m, 10);
       digitalWrite(RED_LED, HIGH);
@@ -36,7 +33,9 @@ void m_stopAll(void) { //Stopping all motors.
   m_set_direct(0, 0);
   m_set_direct(1, 0);
   m_set_direct(2, 0);
+#ifndef ESP32
   m_set_direct(3, 0);
+#endif
 }
 
 //DON NOT CHANGE!!! Values are matched to BLimpduino hardware.
@@ -45,37 +44,41 @@ void m_set_direct(int motor, int value) { //The same as m_set below but with Dea
   switch (motor) {
     case 0: //Motor 0
 #if m0_rev == 0 //if m0_rev is set to 1 it will reverse the motors 
-      output_motor_direct(value, 5, 6);
+      output_motor_direct(value, MOTOR0_PIN_A, MOTOR0_PIN_B);
 #else
-      output_motor_direct(value, 6, 5);
+      output_motor_direct(value, MOTOR0_PIN_B, MOTOR0_PIN_A);
 #endif
       break;
     case 1:
 #if m1_rev == 0
-      output_motor_direct(value, 9, 10); //Motor 1
+      output_motor_direct(value, MOTOR1_PIN_A, MOTOR1_PIN_B); //Motor 1
 #else
-      output_motor_direct(value, 10, 9); //Reversed
+      output_motor_direct(value, MOTOR1_PIN_B, MOTOR1_PIN_A); //Reversed
 #endif
       break;
     case 2:
 #if m2_rev == 0
-      output_motor_direct(value, 7, 8); //Motor 2
+      output_motor_direct(value, MOTOR2_PIN_A, MOTOR2_PIN_B); //Motor 2
 #else
-      output_motor_direct(value, 8, 7); //Reversed
+      output_motor_direct(value, MOTOR2_PIN_B, MOTOR2_PIN_A); //Reversed
 #endif
       break;
+#ifndef ESP32
     case 3:
 #if m3_rev == 0
-      output_motor_direct(value, 11, 12); //Motor 3
+      output_motor_direct(value, MOTOR3_PIN_A, MOTOR3_PIN_B); //Motor 3
 #else
-      output_motor_direct(value, 12, 11); //Reversed
+      output_motor_direct(value, MOTOR3_PIN_B, MOTOR3_PIN_A); //Reversed
 #endif
       break;
+#endif
     case 5: //Will set all motor at the same time. WARNING Reverse not working yet. 
-      output_motor_direct(value, 5, 6);
-      output_motor_direct(value, 9, 10);
-      output_motor_direct(value, 8, 7);
-      output_motor_direct(value, 11, 12);
+      output_motor_direct(value, MOTOR0_PIN_A, MOTOR0_PIN_B);
+      output_motor_direct(value, MOTOR1_PIN_A, MOTOR1_PIN_B);
+      output_motor_direct(value, MOTOR2_PIN_B, MOTOR2_PIN_A);
+#ifndef ESP32
+      output_motor_direct(value, MOTOR3_PIN_A, MOTOR3_PIN_B);
+#endif
       break;
     default:
 
